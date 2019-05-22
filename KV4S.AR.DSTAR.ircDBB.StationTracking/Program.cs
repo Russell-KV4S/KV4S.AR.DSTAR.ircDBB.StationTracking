@@ -113,12 +113,12 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
                                             }
                                             else
                                             {
-                                                Console.WriteLine("Station " + callsign + " has not changed. Still " + strReflector);
+                                                Console.WriteLine("Station " + callsign + " has not transmitted in the last " + intMinutesUntilNotify + " minutes.");
                                             }
                                         }
                                         else
                                         {
-                                            Console.WriteLine("Station " + callsign + " has not changed. Still " + strReflector);
+                                            Console.WriteLine("Station " + callsign + " has not transmitted in the last " + intMinutesUntilNotify + " minutes.");
                                         }
                                     }
                                 }
@@ -222,7 +222,7 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
                     mail.To.Add(emailAddress);
                 }
 
-                mail.Body = "Station " + callSign + " has changed to " + Status;
+                mail.Body = "Station " + callSign + " has transmitted on " + Status;
 
                 SmtpClient smtp = new SmtpClient();
                 smtp.Host = smtpHost;
