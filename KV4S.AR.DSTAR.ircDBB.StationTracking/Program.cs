@@ -22,6 +22,7 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
         public static string smtpPort = ConfigurationManager.AppSettings["SMTPPort"];
         public static string smtpUser = ConfigurationManager.AppSettings["SMTPUser"];
         public static string smtpPswrd = ConfigurationManager.AppSettings["SMTPPassword"];
+        public static int intMinutesUntilNotify = Convert.ToInt32(ConfigurationManager.AppSettings["MinutesUntilNextNotification"]);
 
         private static List<string> _callsignList = null;
         private static string CallsignListString
@@ -82,30 +83,37 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
                                 string[] strSpaces = line.Split(' ');
                                 dt = DateTime.ParseExact(strSpaces[0] + " " + strSpaces[1], "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
                                 strReflector = strSpaces[strSpaces.Count() - 1];
-                                LogLine = dt.ToString("yyyy-MM-dd HH:mm:ss") + "~" + callsign + "~" + strSpaces[strSpaces.Count() - 1] + "~" + strReflector;
+                                LogLine = dt.ToString("yyyy-MM-dd HH:mm:ss") + "~" + callsign + "~" + strReflector;
                             }
                         }
-                        if (File.Exists(callsign + ".txt"))
+                        if (strReflector != "________" && LogLine != "")
                         {
-                            bool updated = false;
-                            using (StreamReader sr = File.OpenText(callsign + ".txt"))
+                            if (File.Exists(callsign + ".txt"))
                             {
-                                String s = "";
-
-                                while ((s = sr.ReadLine()) != null)
+                                bool updated = false;
+                                using (StreamReader sr = File.OpenText(callsign + ".txt"))
                                 {
-                                    if (LogLine != s)
+                                    String s = "";
+
+                                    while ((s = sr.ReadLine()) != null)
                                     {
-                                        string[] strSep = s.Split('~');
-                                        DateTime dtLogTime = DateTime.ParseExact(strSep[0], "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-                                        TimeSpan ts = dtLogTime - dt;
-                                        if (ts.TotalMilliseconds <= 0)
+                                        if (LogLine != s)
                                         {
-                                            Console.WriteLine(LogLine);
-                                            updated = true;
-                                            if (ConfigurationManager.AppSettings["StatusEmails"] == "Y")
+                                            string[] strSep = s.Split('~');
+                                            DateTime dtLogTime = DateTime.ParseExact(strSep[0], "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                                            TimeSpan ts = dt - dtLogTime;
+                                            if (ts.TotalMinutes > intMinutesUntilNotify)
                                             {
-                                                Email(callsign, strReflector);
+                                                Console.WriteLine(LogLine);
+                                                updated = true;
+                                                if (ConfigurationManager.AppSettings["StatusEmails"] == "Y")
+                                                {
+                                                    Email(callsign, strReflector);
+                                                }
+                                            }
+                                            else
+                                            {
+                                                Console.WriteLine("Station " + callsign + " has not changed. Still " + strReflector);
                                             }
                                         }
                                         else
@@ -114,31 +122,35 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
                                         }
                                     }
                                 }
+                                if (updated)
+                                {
+                                    File.Delete(callsign + ".txt");
+                                    FileStream fs = null;
+                                    fs = new FileStream(callsign + ".txt", FileMode.Append);
+                                    StreamWriter log = new StreamWriter(fs);
+                                    log.WriteLine(LogLine);
+                                    log.Close();
+                                    fs.Close();
+                                }
                             }
-                            if (updated)
+                            else
                             {
-                                File.Delete(callsign + ".txt");
                                 FileStream fs = null;
                                 fs = new FileStream(callsign + ".txt", FileMode.Append);
                                 StreamWriter log = new StreamWriter(fs);
                                 log.WriteLine(LogLine);
                                 log.Close();
                                 fs.Close();
+                                Console.WriteLine("Station " + callsign + " is now being tracked on the DSTAR website. Current reflector " + strReflector);
+                                if (ConfigurationManager.AppSettings["StatusEmails"] == "Y")
+                                {
+                                    Email(callsign, strReflector);
+                                }
                             }
                         }
                         else
                         {
-                            FileStream fs = null;
-                            fs = new FileStream(callsign + ".txt", FileMode.Append);
-                            StreamWriter log = new StreamWriter(fs);
-                            log.WriteLine(LogLine);
-                            log.Close();
-                            fs.Close();
-                            Console.WriteLine("Station " + callsign + " is now being tracked on the DSTAR website. Current reflector " + strReflector);
-                            if (ConfigurationManager.AppSettings["StatusEmails"] == "Y")
-                            {
-                                Email(callsign, strReflector);
-                            }
+                            Console.WriteLine("Station " + callsign + " has not transmitted in the last " + intMinutesUntilNotify + " minutes.");
                         }
                     }
                 }
