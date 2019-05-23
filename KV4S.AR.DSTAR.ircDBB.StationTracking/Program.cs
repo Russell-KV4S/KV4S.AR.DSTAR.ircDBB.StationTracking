@@ -66,7 +66,7 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
                     Console.WriteLine("Checking station " + callsign);
 
                     //need to eliminate similar type callsigns and get exact using 8 characters callsign positions in the UR field.
-                    string strFormattedCallsign = callsign.PadRight(callsign.Count() + (8 - callsign.Count()), '_');
+                    string strFormattedCallsign = callsign.PadRight(callsign.Count() + (8 - callsign.Count()), '_') + '/';
 
                     string LogLine = "";
                     DateTime dt = DateTime.Now;
