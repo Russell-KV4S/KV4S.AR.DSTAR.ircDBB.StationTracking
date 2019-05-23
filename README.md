@@ -1,5 +1,5 @@
 # Current Version 1.0
-
+https://github.com/Russell-KV4S/KV4S.AR.DSTAR.ircDBB.StationTracking/releases/download/v1.0/KV4S.AR.DSTAR.ircDBB.StationTracking.zip
 
 # KV4S.AR.DSTAR.ircDBB.StationTracking
 KV4S.AR.DSTAR.ircDBB.StationTracking gives you ability to get email notifications about reflector changes of your favorite D-Star stations.
