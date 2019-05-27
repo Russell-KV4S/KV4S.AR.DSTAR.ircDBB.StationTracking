@@ -67,10 +67,12 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
 
                     //need to eliminate similar type callsigns and get exact using 8 characters callsign positions in the UR field.
                     string strFormattedCallsign = callsign.PadRight(callsign.Count() + (8 - callsign.Count()), '_') + '/';
+                    
 
                     string LogLine = "";
                     DateTime dt = DateTime.Now;
                     string strReflector = "";
+                    string strTarget = "";
 
                     var client = new WebClient();
                     ServicePointManager.Expect100Continue = true;
@@ -86,7 +88,9 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
                                 string[] strSpaces = line.Split(' ');
                                 dt = DateTime.ParseExact(strSpaces[0] + " " + strSpaces[1], "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
                                 strReflector = strSpaces[strSpaces.Count() - 1];
-                                LogLine = dt.ToString("yyyy-MM-dd HH:mm:ss") + "~" + callsign + "~" + strReflector;
+                                int sloc = line.IndexOf(strFormattedCallsign);
+                                strTarget = line.Substring(sloc + 14, 8);
+                                LogLine = dt.ToString("yyyy-MM-dd HH:mm:ss") + "~" + callsign + "~" + strTarget + "~" + strReflector;
                             }
                         }
                         if (strReflector != "________" && LogLine != "")
@@ -111,7 +115,7 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
                                                 updated = true;
                                                 if (ConfigurationManager.AppSettings["StatusEmails"] == "Y")
                                                 {
-                                                    Email(callsign, strReflector);
+                                                    Email(callsign, strTarget, strReflector);
                                                 }
                                             }
                                             else
@@ -144,10 +148,10 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
                                 log.WriteLine(LogLine);
                                 log.Close();
                                 fs.Close();
-                                Console.WriteLine("Station " + callsign + " is now being tracked on the DSTAR website. Current reflector " + strReflector);
+                                Console.WriteLine("Station " + callsign + " is now being tracked on the DSTAR website. Current Target: " + strTarget + " Current Reflector: " + strReflector);
                                 if (ConfigurationManager.AppSettings["StatusEmails"] == "Y")
                                 {
-                                    Email(callsign, strReflector);
+                                    Email(callsign, strTarget ,strReflector);
                                 }
                             }
                         }
@@ -211,7 +215,7 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
             }
         }
 
-        private static void Email(string callSign, string Status)
+        private static void Email(string callSign, string Target, string Status)
         {
             try
             {
@@ -225,7 +229,7 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
                     mail.To.Add(emailAddress);
                 }
 
-                mail.Body = "Station " + callSign + " has transmitted on " + Status;
+                mail.Body = "Station " + callSign + ", with a Target of " + Target + ", has transmitted on " + Status;
 
                 SmtpClient smtp = new SmtpClient();
                 smtp.Host = smtpHost;
