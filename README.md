@@ -1,6 +1,8 @@
 # Current Version 1.0.2
 https://github.com/Russell-KV4S/KV4S.AR.DSTAR.ircDBB.StationTracking/releases/download/v1.2/KV4S.AR.DSTAR.ircDBB.StationTracking.zip
 
+Runs on .Net Framework 4.8 install here: https://dotnet.microsoft.com/en-us/download/dotnet-framework/net48
+
 # KV4S.AR.DSTAR.ircDBB.StationTracking
 KV4S.AR.DSTAR.ircDBB.StationTracking gives you ability to get email notifications about reflector changes of your favorite D-Star stations.
 The program works in conjuction with data from this site: https://www.openquad.net/last.php
@@ -43,4 +45,6 @@ There are comments in the file that tells you how to format the entries. Here is
 </configuration>
 
 ```
+For Telegram setup see the wiki article: https://github.com/Russell-KV4S/KV4S.AR.DSTAR.ircDBB.StationTracking/wiki/Telegram-Setup
+
 Errors will be logged to an ErrorLog.txt 
