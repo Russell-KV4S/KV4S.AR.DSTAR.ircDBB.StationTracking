@@ -1,10 +1,10 @@
-# Current Version 1.0.2
-https://github.com/Russell-KV4S/KV4S.AR.DSTAR.ircDBB.StationTracking/releases/download/v1.2/KV4S.AR.DSTAR.ircDBB.StationTracking.zip
+# Current Version 1.0.3
+https://github.com/Russell-KV4S/KV4S.AR.DSTAR.ircDBB.StationTracking/releases/download/v1.0.3/KV4S.AR.DSTAR.ircDBB.StationTracking.zip
 
 Runs on .Net Framework 4.8 install here: https://dotnet.microsoft.com/en-us/download/dotnet-framework/net48
 
 # KV4S.AR.DSTAR.ircDBB.StationTracking
-KV4S.AR.DSTAR.ircDBB.StationTracking gives you ability to get email notifications about reflector changes of your favorite D-Star stations.
+KV4S.AR.DSTAR.ircDBB.StationTracking gives you ability to get Email and/or Telegram notifications about reflector changes of your favorite D-Star stations.
 The program works in conjuction with data from this site: https://www.openquad.net/last.php
 
 Note: this only tracks stations coming through ircDBB not on the traditional ICOM repeater stack. If you are interested in that as well check out this project by Bill (AB4EJ) and myself:
@@ -30,8 +30,15 @@ There are comments in the file that tells you how to format the entries. Here is
         <add key="Unattended" value="N"/>
         <add key="EmailError" value="Y"/>
         <add key="StatusEmails" value="Y"/>
+        <add key="TelegramError" value="Y"/>
+		<add key="TelegramStatus" value="Y"/>
+        
         <!--Enter Value in Minutes-->
         <add key="MinutesUntilNextNotification" value="60"/>
+        
+        <!--Telegram Parameters-->
+		<add key="BotToken" value="12345"/>
+		<add key="DestinationID" value="1234"/>
       
       <!--Email Parameters - Gmail example-->
       <!--use commas with no spaces to add more emails to the email To and From field-->
