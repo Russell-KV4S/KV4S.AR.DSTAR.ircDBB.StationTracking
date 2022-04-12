@@ -31,14 +31,14 @@ There are comments in the file that tells you how to format the entries. Here is
         <add key="EmailError" value="Y"/>
         <add key="StatusEmails" value="Y"/>
         <add key="TelegramError" value="Y"/>
-		<add key="TelegramStatus" value="Y"/>
+	<add key="TelegramStatus" value="Y"/>
         
         <!--Enter Value in Minutes-->
         <add key="MinutesUntilNextNotification" value="60"/>
         
         <!--Telegram Parameters-->
-		<add key="BotToken" value="12345"/>
-		<add key="DestinationID" value="1234"/>
+	<add key="BotToken" value="12345"/>
+	<add key="DestinationID" value="1234"/>
       
       <!--Email Parameters - Gmail example-->
       <!--use commas with no spaces to add more emails to the email To and From field-->
