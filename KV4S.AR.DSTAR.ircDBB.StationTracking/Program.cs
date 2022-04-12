@@ -6,8 +6,8 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Mail;
-using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
+using Telegram.Bot;
 
 namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
 {
@@ -16,13 +16,20 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
         public static string URL = "https://irc-1.openquad.net/ics/ics.txt";
 
         //load from App.config
+        public static int intMinutesUntilNotify = Convert.ToInt32(ConfigurationManager.AppSettings["MinutesUntilNextNotification"]);
+
+        //telegram
+        public static TelegramBotClient bot = new TelegramBotClient(ConfigurationManager.AppSettings["BotToken"]);
+        public static string destinationID = ConfigurationManager.AppSettings["DestinationID"];
+        public static int intSleepTime = 2000;
+
+        //email
         public static MailAddress from = new MailAddress(ConfigurationManager.AppSettings["EmailFrom"]);
         public static string toConfig = ConfigurationManager.AppSettings["EmailTo"];
         public static string smtpHost = ConfigurationManager.AppSettings["SMTPHost"];
         public static string smtpPort = ConfigurationManager.AppSettings["SMTPPort"];
         public static string smtpUser = ConfigurationManager.AppSettings["SMTPUser"];
-        public static string smtpPswrd = ConfigurationManager.AppSettings["SMTPPassword"];
-        public static int intMinutesUntilNotify = Convert.ToInt32(ConfigurationManager.AppSettings["MinutesUntilNextNotification"]);
+        public static string smtpPswrd = ConfigurationManager.AppSettings["SMTPPassword"];        
 
         private static List<string> _callsignList = null;
         private static string CallsignListString
@@ -117,6 +124,12 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
                                                 {
                                                     Email(callsign, strTarget, strReflector);
                                                 }
+                                                if (ConfigurationManager.AppSettings["TelegramStatus"] == "Y")
+                                                {
+                                                    bot.SendTextMessageAsync(destinationID, "DSTAR.StationTracking - Station " +
+                                                        callsign + ", with a Target of " + strTarget + ", has transmitted on " + strReflector);
+                                                    Thread.Sleep(intSleepTime);
+                                                }
                                             }
                                             else
                                             {
@@ -153,6 +166,12 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
                                 {
                                     Email(callsign, strTarget ,strReflector);
                                 }
+                                if (ConfigurationManager.AppSettings["TelegramStatus"] == "Y")
+                                {
+                                    bot.SendTextMessageAsync(destinationID, "DSTAR.StationTracking - Station " +
+                                        callsign + ", with a Target of " + strTarget + ", has transmitted on " + strReflector);
+                                    Thread.Sleep(intSleepTime);
+                                }
                             }
                         }
                         else
@@ -171,6 +190,11 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
                 if (ConfigurationManager.AppSettings["EmailError"] == "Y")
                 {
                     EmailError(ex.Message, ex.Source);
+                }
+                if (ConfigurationManager.AppSettings["TelegramError"] == "Y")
+                {
+                    bot.SendTextMessageAsync(destinationID, "DSTAR.StationTracking Error - Message: " + ex.Message + " Source: " + ex.Source);
+                    Thread.Sleep(intSleepTime);
                 }
             }
             finally
@@ -258,7 +282,7 @@ namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
                 log.Close();
                 fs.Close();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 Console.WriteLine("Error logging previous error.");
                 Console.WriteLine("Make sure the Error log is not open.");
