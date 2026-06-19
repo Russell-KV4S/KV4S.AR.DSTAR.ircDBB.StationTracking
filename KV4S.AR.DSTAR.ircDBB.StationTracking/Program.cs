@@ -145,17 +145,17 @@ internal class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Program encountered and error:");
-            Console.WriteLine(ex.Message);
+            Console.WriteLine("Program encountered an error.");
+            Console.WriteLine("See ErrorLog.txt for details.");
             LogError(ex.Message, ex.Source ?? "Unknown");
             if (ConfigurationManager.AppSettings["EmailError"] == "Y")
             {
-                EmailError(ex.Message, ex.Source ?? "Unknown");
+                EmailError();
             }
 
             if (ConfigurationManager.AppSettings["TelegramError"] == "Y")
             {
-                await SendTelegramMessageAsync("DSTAR.StationTracking Error - Message: " + ex.Message + " Source: " + ex.Source);
+                await SendTelegramMessageAsync("DSTAR.StationTracking Error - The application encountered an error. Review ErrorLog.txt for details.");
             }
         }
         finally
@@ -200,7 +200,7 @@ internal class Program
 
     private static string GetStationLogPath(string callsign) => Path.Combine(AppContext.BaseDirectory, callsign + ".txt");
 
-    private static void EmailError(string message, string source)
+    private static void EmailError()
     {
         try
         {
@@ -208,7 +208,7 @@ internal class Program
             {
                 Subject = "DSTAR.StationTracking Error",
                 From = From,
-                Body = "Message: " + message + " Source: " + source
+                Body = "The application encountered an error. Review ErrorLog.txt for details."
             };
 
             EmailAddressListString = ToConfig;
@@ -229,7 +229,7 @@ internal class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine("Program encountered and an error sending email:");
+            Console.WriteLine("Program encountered an error sending email:");
             Console.WriteLine(ex.Message);
             LogError(ex.Message, ex.Source ?? "Unknown");
         }
