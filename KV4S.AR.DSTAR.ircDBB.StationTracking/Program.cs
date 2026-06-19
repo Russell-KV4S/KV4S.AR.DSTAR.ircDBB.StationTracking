@@ -11,7 +11,10 @@ internal class Program
 {
     private const string Url = "https://irc-1.openquad.net/ics/ics.txt";
     private const int SleepTimeMilliseconds = 2000;
-    private static readonly HttpClient HttpClient = new();
+    private static readonly HttpClient HttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(30)
+    };
 
     private static readonly int MinutesUntilNotify = Convert.ToInt32(ConfigurationManager.AppSettings["MinutesUntilNextNotification"]);
     private static readonly TelegramBotClient Bot = new(ConfigurationManager.AppSettings["BotToken"]);
@@ -46,7 +49,13 @@ internal class Program
             Console.WriteLine("Please Stand by.....");
             Console.WriteLine(" ");
 
-            CallsignListString = ConfigurationManager.AppSettings["Callsigns"].ToUpperInvariant();
+            var configuredCallsigns = ConfigurationManager.AppSettings["Callsigns"];
+            if (string.IsNullOrWhiteSpace(configuredCallsigns))
+            {
+                throw new ConfigurationErrorsException("The 'Callsigns' setting is required.");
+            }
+
+            CallsignListString = configuredCallsigns.ToUpperInvariant();
             var trackingLines = await DownloadTrackingLinesAsync();
 
             foreach (var callsign in _callsignList)
@@ -146,7 +155,7 @@ internal class Program
         catch (Exception ex)
         {
             Console.WriteLine("Program encountered an error.");
-            Console.WriteLine("See ErrorLog.txt for details.");
+            Console.WriteLine("See " + ErrorLogPath + " for details.");
             LogError(ex.Message, ex.Source ?? "Unknown");
             if (ConfigurationManager.AppSettings["EmailError"] == "Y")
             {
@@ -155,7 +164,7 @@ internal class Program
 
             if (ConfigurationManager.AppSettings["TelegramError"] == "Y")
             {
-                await SendTelegramMessageAsync("DSTAR.StationTracking Error - The application encountered an error. Review ErrorLog.txt for details.");
+                await SendTelegramMessageAsync("DSTAR.StationTracking Error - The application encountered an error. Review " + ErrorLogPath + " for details.");
             }
         }
         finally
@@ -165,6 +174,8 @@ internal class Program
                 Console.WriteLine("Press any key on your keyboard to quit...");
                 Console.ReadKey();
             }
+
+            HttpClient.Dispose();
         }
     }
 
@@ -198,6 +209,8 @@ internal class Program
         }
     }
 
+    private static string ErrorLogPath => Path.Combine(AppContext.BaseDirectory, "ErrorLog.txt");
+
     private static string GetStationLogPath(string callsign) => Path.Combine(AppContext.BaseDirectory, callsign + ".txt");
 
     private static void EmailError()
@@ -208,7 +221,7 @@ internal class Program
             {
                 Subject = "DSTAR.StationTracking Error",
                 From = From,
-                Body = "The application encountered an error. Review ErrorLog.txt for details."
+                Body = "The application encountered an error. Review " + ErrorLogPath + " for details."
             };
 
             EmailAddressListString = ToConfig;
@@ -275,7 +288,7 @@ internal class Program
         try
         {
             File.AppendAllText(
-                Path.Combine(AppContext.BaseDirectory, "ErrorLog.txt"),
+                ErrorLogPath,
                 DateTime.Now + " Error: " + message + " Source: " + source + Environment.NewLine);
         }
         catch (Exception)
