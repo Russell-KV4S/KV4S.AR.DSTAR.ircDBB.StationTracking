@@ -81,7 +81,7 @@ internal class Program
                     {
                         var updated = false;
                         using var streamReader = File.OpenText(logFilePath);
-                        string? previousLogLine;
+                        string previousLogLine;
 
                         while ((previousLogLine = streamReader.ReadLine()) is not null)
                         {
@@ -163,7 +163,7 @@ internal class Program
         }
         finally
         {
-            if (ConfigurationManager.AppSettings["Unattended"] == "N")
+            if (ConfigurationManager.AppSettings["Unattended"] == "N" && !Console.IsInputRedirected)
             {
                 Console.WriteLine("Press any key on your keyboard to quit...");
                 Console.ReadKey();
@@ -173,13 +173,10 @@ internal class Program
 
     private static async Task<List<string>> DownloadTrackingLinesAsync()
     {
-        ServicePointManager.Expect100Continue = true;
-        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-
         using var stream = await HttpClient.GetStreamAsync(Url);
         using var reader = new StreamReader(stream);
         var lines = new List<string>();
-        string? line;
+        string line;
 
         while ((line = await reader.ReadLineAsync()) is not null)
         {
