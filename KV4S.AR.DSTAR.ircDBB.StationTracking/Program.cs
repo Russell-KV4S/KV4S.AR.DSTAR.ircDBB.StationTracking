@@ -13,8 +13,6 @@ internal class Program
     private const int SleepTimeMilliseconds = 2000;
 
     private static readonly int MinutesUntilNotify = Convert.ToInt32(ConfigurationManager.AppSettings["MinutesUntilNextNotification"]);
-    private static readonly TelegramBotClient Bot = new(ConfigurationManager.AppSettings["BotToken"]);
-    private static readonly string DestinationId = ConfigurationManager.AppSettings["DestinationID"];
     private static readonly MailAddress From = new(ConfigurationManager.AppSettings["EmailFrom"]);
     private static readonly string ToConfig = ConfigurationManager.AppSettings["EmailTo"];
     private static readonly string SmtpHost = ConfigurationManager.AppSettings["SMTPHost"];
@@ -24,6 +22,7 @@ internal class Program
 
     private static List<string> _callsignList = [];
     private static List<string> _emailAddressList = [];
+    private static TelegramBotClient _bot;
 
     private static string CallsignListString
     {
@@ -35,6 +34,10 @@ internal class Program
         set => _emailAddressList = [.. value.Split(',', StringSplitOptions.RemoveEmptyEntries)];
     }
 
+    private static TelegramBotClient Bot => _bot ??= new TelegramBotClient(GetRequiredSetting("BotToken"));
+
+    private static string DestinationId => GetRequiredSetting("DestinationID");
+
     private static async Task Main(string[] args)
     {
         try
@@ -45,13 +48,7 @@ internal class Program
             Console.WriteLine("Please Stand by.....");
             Console.WriteLine(" ");
 
-            var configuredCallsigns = ConfigurationManager.AppSettings["Callsigns"];
-            if (string.IsNullOrWhiteSpace(configuredCallsigns))
-            {
-                throw new ConfigurationErrorsException("The 'Callsigns' setting is required.");
-            }
-
-            CallsignListString = configuredCallsigns.ToUpperInvariant();
+            CallsignListString = GetRequiredSetting("Callsigns").ToUpperInvariant();
             var trackingLines = await DownloadTrackingLinesAsync();
 
             foreach (var callsign in _callsignList)
@@ -206,6 +203,17 @@ internal class Program
             Console.WriteLine(ex.Message);
             LogError(ex.Message, ex.Source ?? "Unknown");
         }
+    }
+
+    private static string GetRequiredSetting(string key)
+    {
+        var value = ConfigurationManager.AppSettings[key];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ConfigurationErrorsException("The '" + key + "' setting is required.");
+        }
+
+        return value;
     }
 
     private static string ErrorLogPath => Path.Combine(AppContext.BaseDirectory, "ErrorLog.txt");
