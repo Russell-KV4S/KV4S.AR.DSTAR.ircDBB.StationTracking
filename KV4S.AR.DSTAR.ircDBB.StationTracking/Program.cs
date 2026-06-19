@@ -101,9 +101,8 @@ internal class Program
 
                                     if (ConfigurationManager.AppSettings["TelegramStatus"] == "Y")
                                     {
-                                        await Bot.SendTextMessageAsync(DestinationId, "DSTAR.StationTracking - Station " +
+                                        await SendTelegramMessageAsync("DSTAR.StationTracking - Station " +
                                             callsign + ", with a Target of " + target + ", has transmitted on " + reflector);
-                                        await Task.Delay(SleepTimeMilliseconds);
                                     }
                                 }
                                 else
@@ -133,9 +132,8 @@ internal class Program
 
                         if (ConfigurationManager.AppSettings["TelegramStatus"] == "Y")
                         {
-                            await Bot.SendTextMessageAsync(DestinationId, "DSTAR.StationTracking - Station " +
+                            await SendTelegramMessageAsync("DSTAR.StationTracking - Station " +
                                 callsign + ", with a Target of " + target + ", has transmitted on " + reflector);
-                            await Task.Delay(SleepTimeMilliseconds);
                         }
                     }
                 }
@@ -157,8 +155,7 @@ internal class Program
 
             if (ConfigurationManager.AppSettings["TelegramError"] == "Y")
             {
-                await Bot.SendTextMessageAsync(DestinationId, "DSTAR.StationTracking Error - Message: " + ex.Message + " Source: " + ex.Source);
-                await Task.Delay(SleepTimeMilliseconds);
+                await SendTelegramMessageAsync("DSTAR.StationTracking Error - Message: " + ex.Message + " Source: " + ex.Source);
             }
         }
         finally
@@ -184,6 +181,21 @@ internal class Program
         }
 
         return lines;
+    }
+
+    private static async Task SendTelegramMessageAsync(string message)
+    {
+        try
+        {
+            await Bot.SendTextMessageAsync(DestinationId, message);
+            await Task.Delay(SleepTimeMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error sending Telegram message:");
+            Console.WriteLine(ex.Message);
+            LogError(ex.Message, ex.Source ?? "Unknown");
+        }
     }
 
     private static string GetStationLogPath(string callsign) => Path.Combine(AppContext.BaseDirectory, callsign + ".txt");
