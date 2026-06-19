@@ -11,10 +11,6 @@ internal class Program
 {
     private const string Url = "https://irc-1.openquad.net/ics/ics.txt";
     private const int SleepTimeMilliseconds = 2000;
-    private static readonly HttpClient HttpClient = new()
-    {
-        Timeout = TimeSpan.FromSeconds(30)
-    };
 
     private static readonly int MinutesUntilNotify = Convert.ToInt32(ConfigurationManager.AppSettings["MinutesUntilNextNotification"]);
     private static readonly TelegramBotClient Bot = new(ConfigurationManager.AppSettings["BotToken"]);
@@ -169,19 +165,22 @@ internal class Program
         }
         finally
         {
-            if (ConfigurationManager.AppSettings["Unattended"] == "N" && !Console.IsInputRedirected)
+            if ("N".Equals(ConfigurationManager.AppSettings["Unattended"], StringComparison.OrdinalIgnoreCase) && !Console.IsInputRedirected)
             {
                 Console.WriteLine("Press any key on your keyboard to quit...");
                 Console.ReadKey();
             }
-
-            HttpClient.Dispose();
         }
     }
 
     private static async Task<List<string>> DownloadTrackingLinesAsync()
     {
-        using var stream = await HttpClient.GetStreamAsync(Url);
+        using var httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
+
+        using var stream = await httpClient.GetStreamAsync(Url);
         using var reader = new StreamReader(stream);
         var lines = new List<string>();
         string line;
