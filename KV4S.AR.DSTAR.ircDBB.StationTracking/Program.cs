@@ -1,292 +1,278 @@
-﻿using System;
-using System.Collections.Generic;
 using System.Configuration;
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Net.Mail;
-using System.Threading;
 using Telegram.Bot;
 
-namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking
+namespace KV4S.AmateurRadio.DSTAR.IRCDBB.StationTracking;
+
+internal class Program
 {
-    class Program
+    private const string Url = "https://irc-1.openquad.net/ics/ics.txt";
+    private const int SleepTimeMilliseconds = 2000;
+    private static readonly HttpClient HttpClient = new();
+
+    private static readonly int MinutesUntilNotify = Convert.ToInt32(ConfigurationManager.AppSettings["MinutesUntilNextNotification"]);
+    private static readonly TelegramBotClient Bot = new(ConfigurationManager.AppSettings["BotToken"]);
+    private static readonly string DestinationId = ConfigurationManager.AppSettings["DestinationID"];
+    private static readonly MailAddress From = new(ConfigurationManager.AppSettings["EmailFrom"]);
+    private static readonly string ToConfig = ConfigurationManager.AppSettings["EmailTo"];
+    private static readonly string SmtpHost = ConfigurationManager.AppSettings["SMTPHost"];
+    private static readonly string SmtpPort = ConfigurationManager.AppSettings["SMTPPort"];
+    private static readonly string SmtpUser = ConfigurationManager.AppSettings["SMTPUser"];
+    private static readonly string SmtpPassword = ConfigurationManager.AppSettings["SMTPPassword"];
+
+    private static List<string> _callsignList = [];
+    private static List<string> _emailAddressList = [];
+
+    private static string CallsignListString
     {
-        public static string URL = "https://irc-1.openquad.net/ics/ics.txt";
+        set => _callsignList = [.. value.Split(',', StringSplitOptions.RemoveEmptyEntries)];
+    }
 
-        //load from App.config
-        public static int intMinutesUntilNotify = Convert.ToInt32(ConfigurationManager.AppSettings["MinutesUntilNextNotification"]);
+    private static string EmailAddressListString
+    {
+        set => _emailAddressList = [.. value.Split(',', StringSplitOptions.RemoveEmptyEntries)];
+    }
 
-        //telegram
-        public static TelegramBotClient bot = new TelegramBotClient(ConfigurationManager.AppSettings["BotToken"]);
-        public static string destinationID = ConfigurationManager.AppSettings["DestinationID"];
-        public static int intSleepTime = 2000;
-
-        //email
-        public static MailAddress from = new MailAddress(ConfigurationManager.AppSettings["EmailFrom"]);
-        public static string toConfig = ConfigurationManager.AppSettings["EmailTo"];
-        public static string smtpHost = ConfigurationManager.AppSettings["SMTPHost"];
-        public static string smtpPort = ConfigurationManager.AppSettings["SMTPPort"];
-        public static string smtpUser = ConfigurationManager.AppSettings["SMTPUser"];
-        public static string smtpPswrd = ConfigurationManager.AppSettings["SMTPPassword"];        
-
-        private static List<string> _callsignList = null;
-        private static string CallsignListString
+    private static async Task Main(string[] args)
+    {
+        try
         {
-            set
+            Console.WriteLine("Welcome to the D-STAR Station Tracker Application by KV4S!");
+            Console.WriteLine(" ");
+            Console.WriteLine("Beginning download from " + Url);
+            Console.WriteLine("Please Stand by.....");
+            Console.WriteLine(" ");
+
+            CallsignListString = ConfigurationManager.AppSettings["Callsigns"].ToUpperInvariant();
+            var trackingLines = await DownloadTrackingLinesAsync();
+
+            foreach (var callsign in _callsignList)
             {
-                string[] callsignArray = value.Split(',');
-                _callsignList = new List<string>(callsignArray.Length);
-                _callsignList.AddRange(callsignArray);
-            }
-        }
+                Console.WriteLine("Checking station " + callsign);
 
-        private static List<string> _emailAddressList = null;
-        private static string EmailAddressListString
-        {
-            set
-            {
-                string[] emailAddressArray = value.Split(',');
-                _emailAddressList = new List<string>(emailAddressArray.Length);
-                _emailAddressList.AddRange(emailAddressArray);
-            }
-        }
+                var formattedCallsign = callsign.PadRight(8, '_') + '/';
+                var logLine = string.Empty;
+                var transmissionTime = DateTime.Now;
+                var reflector = string.Empty;
+                var target = string.Empty;
 
-
-
-        static void Main(string[] args)
-        {
-            try
-            {
-                Console.WriteLine("Welcome to the D-STAR Station Tracker Application by KV4S!");
-                Console.WriteLine(" ");
-                Console.WriteLine("Beginning download from " + URL);
-                Console.WriteLine("Please Stand by.....");
-                Console.WriteLine(" ");
-
-
-
-                CallsignListString = ConfigurationManager.AppSettings["Callsigns"].ToUpper();
-                foreach (string callsign in _callsignList)
+                foreach (var line in trackingLines)
                 {
-                    Console.WriteLine("Checking station " + callsign);
-
-                    //need to eliminate similar type callsigns and get exact using 8 characters callsign positions in the UR field.
-                    string strFormattedCallsign = callsign.PadRight(callsign.Count() + (8 - callsign.Count()), '_') + '/';
-                    
-
-                    string LogLine = "";
-                    DateTime dt = DateTime.Now;
-                    string strReflector = "";
-                    string strTarget = "";
-
-                    var client = new WebClient();
-                    ServicePointManager.Expect100Continue = true;
-                    ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-                    using (var stream = client.OpenRead(URL))
-                    using (var reader = new StreamReader(stream))
+                    if (!line.Contains(formattedCallsign, StringComparison.Ordinal))
                     {
-                        string line;
-                        while ((line = reader.ReadLine()) != null)
-                        {
-                            if (line.Contains(strFormattedCallsign))
-                            {
-                                string[] strSpaces = line.Split(' ');
-                                dt = DateTime.ParseExact(strSpaces[0] + " " + strSpaces[1], "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-                                strReflector = strSpaces[strSpaces.Count() - 1];
-                                int sloc = line.IndexOf(strFormattedCallsign);
-                                strTarget = line.Substring(sloc + 14, 8);
-                                LogLine = dt.ToString("yyyy-MM-dd HH:mm:ss") + "~" + callsign + "~" + strTarget + "~" + strReflector;
-                            }
-                        }
-                        if (strReflector != "________" && LogLine != "")
-                        {
-                            if (File.Exists(callsign + ".txt"))
-                            {
-                                bool updated = false;
-                                using (StreamReader sr = File.OpenText(callsign + ".txt"))
-                                {
-                                    String s = "";
+                        continue;
+                    }
 
-                                    while ((s = sr.ReadLine()) != null)
+                    var parts = line.Split(' ');
+                    transmissionTime = DateTime.ParseExact($"{parts[0]} {parts[1]}", "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                    reflector = parts[^1];
+                    var callsignLocation = line.IndexOf(formattedCallsign, StringComparison.Ordinal);
+                    target = line.Substring(callsignLocation + 14, 8);
+                    logLine = $"{transmissionTime:yyyy-MM-dd HH:mm:ss}~{callsign}~{target}~{reflector}";
+                }
+
+                if (reflector != "________" && logLine.Length > 0)
+                {
+                    var logFilePath = GetStationLogPath(callsign);
+                    if (File.Exists(logFilePath))
+                    {
+                        var updated = false;
+                        using var streamReader = File.OpenText(logFilePath);
+                        string? previousLogLine;
+
+                        while ((previousLogLine = streamReader.ReadLine()) is not null)
+                        {
+                            if (logLine != previousLogLine)
+                            {
+                                var storedLogParts = previousLogLine.Split('~');
+                                var previousTransmissionTime = DateTime.ParseExact(storedLogParts[0], "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                                var elapsed = transmissionTime - previousTransmissionTime;
+                                if (elapsed.TotalMinutes > MinutesUntilNotify)
+                                {
+                                    Console.WriteLine(logLine);
+                                    updated = true;
+                                    if (ConfigurationManager.AppSettings["StatusEmails"] == "Y")
                                     {
-                                        if (LogLine != s)
-                                        {
-                                            string[] strSep = s.Split('~');
-                                            DateTime dtLogTime = DateTime.ParseExact(strSep[0], "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-                                            TimeSpan ts = dt - dtLogTime;
-                                            if (ts.TotalMinutes > intMinutesUntilNotify)
-                                            {
-                                                Console.WriteLine(LogLine);
-                                                updated = true;
-                                                if (ConfigurationManager.AppSettings["StatusEmails"] == "Y")
-                                                {
-                                                    Email(callsign, strTarget, strReflector);
-                                                }
-                                                if (ConfigurationManager.AppSettings["TelegramStatus"] == "Y")
-                                                {
-                                                    bot.SendTextMessageAsync(destinationID, "DSTAR.StationTracking - Station " +
-                                                        callsign + ", with a Target of " + strTarget + ", has transmitted on " + strReflector);
-                                                    Thread.Sleep(intSleepTime);
-                                                }
-                                            }
-                                            else
-                                            {
-                                                Console.WriteLine("Station " + callsign + " has not transmitted in the last " + intMinutesUntilNotify + " minutes.");
-                                            }
-                                        }
-                                        else
-                                        {
-                                            Console.WriteLine("Station " + callsign + " has not transmitted in the last " + intMinutesUntilNotify + " minutes.");
-                                        }
+                                        Email(callsign, target, reflector);
+                                    }
+
+                                    if (ConfigurationManager.AppSettings["TelegramStatus"] == "Y")
+                                    {
+                                        await Bot.SendTextMessageAsync(DestinationId, "DSTAR.StationTracking - Station " +
+                                            callsign + ", with a Target of " + target + ", has transmitted on " + reflector);
+                                        await Task.Delay(SleepTimeMilliseconds);
                                     }
                                 }
-                                if (updated)
+                                else
                                 {
-                                    File.Delete(callsign + ".txt");
-                                    FileStream fs = null;
-                                    fs = new FileStream(callsign + ".txt", FileMode.Append);
-                                    StreamWriter log = new StreamWriter(fs);
-                                    log.WriteLine(LogLine);
-                                    log.Close();
-                                    fs.Close();
+                                    Console.WriteLine("Station " + callsign + " has not transmitted in the last " + MinutesUntilNotify + " minutes.");
                                 }
                             }
                             else
                             {
-                                FileStream fs = null;
-                                fs = new FileStream(callsign + ".txt", FileMode.Append);
-                                StreamWriter log = new StreamWriter(fs);
-                                log.WriteLine(LogLine);
-                                log.Close();
-                                fs.Close();
-                                Console.WriteLine("Station " + callsign + " is now being tracked on the DSTAR website. Current Target: " + strTarget + " Current Reflector: " + strReflector);
-                                if (ConfigurationManager.AppSettings["StatusEmails"] == "Y")
-                                {
-                                    Email(callsign, strTarget ,strReflector);
-                                }
-                                if (ConfigurationManager.AppSettings["TelegramStatus"] == "Y")
-                                {
-                                    bot.SendTextMessageAsync(destinationID, "DSTAR.StationTracking - Station " +
-                                        callsign + ", with a Target of " + strTarget + ", has transmitted on " + strReflector);
-                                    Thread.Sleep(intSleepTime);
-                                }
+                                Console.WriteLine("Station " + callsign + " has not transmitted in the last " + MinutesUntilNotify + " minutes.");
                             }
                         }
-                        else
+
+                        if (updated)
                         {
-                            Console.WriteLine("Station " + callsign + " has not transmitted in the last " + intMinutesUntilNotify + " minutes.");
+                            File.WriteAllText(logFilePath, logLine + Environment.NewLine);
+                        }
+                    }
+                    else
+                    {
+                        File.WriteAllText(logFilePath, logLine + Environment.NewLine);
+                        Console.WriteLine("Station " + callsign + " is now being tracked on the DSTAR website. Current Target: " + target + " Current Reflector: " + reflector);
+                        if (ConfigurationManager.AppSettings["StatusEmails"] == "Y")
+                        {
+                            Email(callsign, target, reflector);
+                        }
+
+                        if (ConfigurationManager.AppSettings["TelegramStatus"] == "Y")
+                        {
+                            await Bot.SendTextMessageAsync(DestinationId, "DSTAR.StationTracking - Station " +
+                                callsign + ", with a Target of " + target + ", has transmitted on " + reflector);
+                            await Task.Delay(SleepTimeMilliseconds);
                         }
                     }
                 }
-
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Program encountered and error:");
-                Console.WriteLine(ex.Message);
-                LogError(ex.Message, ex.Source);
-                if (ConfigurationManager.AppSettings["EmailError"] == "Y")
+                else
                 {
-                    EmailError(ex.Message, ex.Source);
-                }
-                if (ConfigurationManager.AppSettings["TelegramError"] == "Y")
-                {
-                    bot.SendTextMessageAsync(destinationID, "DSTAR.StationTracking Error - Message: " + ex.Message + " Source: " + ex.Source);
-                    Thread.Sleep(intSleepTime);
-                }
-            }
-            finally
-            {
-                if (ConfigurationManager.AppSettings["Unattended"] == "N")
-                {
-                    Console.WriteLine("Press any key on your keyboard to quit...");
-                    Console.ReadKey();
+                    Console.WriteLine("Station " + callsign + " has not transmitted in the last " + MinutesUntilNotify + " minutes.");
                 }
             }
         }
-
-        private static void EmailError(string Message, string Source)
+        catch (Exception ex)
         {
-            try
+            Console.WriteLine("Program encountered and error:");
+            Console.WriteLine(ex.Message);
+            LogError(ex.Message, ex.Source ?? "Unknown");
+            if (ConfigurationManager.AppSettings["EmailError"] == "Y")
             {
-                MailMessage mail = new MailMessage();
-                mail.Subject = "DSTAR.StationTracking Error";
-                mail.From = from;
-
-                EmailAddressListString = toConfig;
-                foreach (string emailAddress in _emailAddressList)
-                {
-                    mail.To.Add(emailAddress);
-                }
-
-                mail.Body = "Message: " + Message + " Source: " + Source;
-
-                SmtpClient smtp = new SmtpClient();
-                smtp.Host = smtpHost;
-                smtp.Port = Convert.ToInt32(smtpPort);
-
-                smtp.Credentials = new NetworkCredential(smtpUser, smtpPswrd);
-                smtp.EnableSsl = true;
-                smtp.Send(mail);
+                EmailError(ex.Message, ex.Source ?? "Unknown");
             }
-            catch (Exception ex)
+
+            if (ConfigurationManager.AppSettings["TelegramError"] == "Y")
             {
-                Console.WriteLine("Program encountered and an error sending email:");
-                Console.WriteLine(ex.Message);
-                LogError(ex.Message, ex.Source);
+                await Bot.SendTextMessageAsync(DestinationId, "DSTAR.StationTracking Error - Message: " + ex.Message + " Source: " + ex.Source);
+                await Task.Delay(SleepTimeMilliseconds);
             }
         }
-
-        private static void Email(string callSign, string Target, string Status)
+        finally
         {
-            try
+            if (ConfigurationManager.AppSettings["Unattended"] == "N")
             {
-                MailMessage mail = new MailMessage();
-                mail.Subject = "DSTAR.StationTracking";
-                mail.From = from;
-
-                EmailAddressListString = toConfig;
-                foreach (string emailAddress in _emailAddressList)
-                {
-                    mail.To.Add(emailAddress);
-                }
-
-                mail.Body = "Station " + callSign + ", with a Target of " + Target + ", has transmitted on " + Status;
-
-                SmtpClient smtp = new SmtpClient();
-                smtp.Host = smtpHost;
-                smtp.Port = Convert.ToInt32(smtpPort);
-
-                smtp.Credentials = new NetworkCredential(smtpUser, smtpPswrd);
-                smtp.EnableSsl = true;
-                smtp.Send(mail);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error sending email:");
-                Console.WriteLine(ex.Message);
-                LogError(ex.Message, ex.Source);
+                Console.WriteLine("Press any key on your keyboard to quit...");
+                Console.ReadKey();
             }
         }
+    }
 
-        private static void LogError(string Message, string source)
+    private static async Task<List<string>> DownloadTrackingLinesAsync()
+    {
+        ServicePointManager.Expect100Continue = true;
+        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+
+        using var stream = await HttpClient.GetStreamAsync(Url);
+        using var reader = new StreamReader(stream);
+        var lines = new List<string>();
+        string? line;
+
+        while ((line = await reader.ReadLineAsync()) is not null)
         {
-            try
+            lines.Add(line);
+        }
+
+        return lines;
+    }
+
+    private static string GetStationLogPath(string callsign) => Path.Combine(AppContext.BaseDirectory, callsign + ".txt");
+
+    private static void EmailError(string message, string source)
+    {
+        try
+        {
+            using var mail = new MailMessage
             {
-                FileStream fs = null;
-                fs = new FileStream("ErrorLog.txt", FileMode.Append);
-                StreamWriter log = new StreamWriter(fs);
-                log.WriteLine(DateTime.Now + " Error: " + Message + " Source: " + source);
-                log.Close();
-                fs.Close();
-            }
-            catch (Exception)
+                Subject = "DSTAR.StationTracking Error",
+                From = From,
+                Body = "Message: " + message + " Source: " + source
+            };
+
+            EmailAddressListString = ToConfig;
+            foreach (var emailAddress in _emailAddressList)
             {
-                Console.WriteLine("Error logging previous error.");
-                Console.WriteLine("Make sure the Error log is not open.");
+                mail.To.Add(emailAddress);
             }
+
+            using var smtp = new SmtpClient
+            {
+                Host = SmtpHost,
+                Port = Convert.ToInt32(SmtpPort),
+                Credentials = new NetworkCredential(SmtpUser, SmtpPassword),
+                EnableSsl = true
+            };
+
+            smtp.Send(mail);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Program encountered and an error sending email:");
+            Console.WriteLine(ex.Message);
+            LogError(ex.Message, ex.Source ?? "Unknown");
+        }
+    }
+
+    private static void Email(string callSign, string target, string status)
+    {
+        try
+        {
+            using var mail = new MailMessage
+            {
+                Subject = "DSTAR.StationTracking",
+                From = From,
+                Body = "Station " + callSign + ", with a Target of " + target + ", has transmitted on " + status
+            };
+
+            EmailAddressListString = ToConfig;
+            foreach (var emailAddress in _emailAddressList)
+            {
+                mail.To.Add(emailAddress);
+            }
+
+            using var smtp = new SmtpClient
+            {
+                Host = SmtpHost,
+                Port = Convert.ToInt32(SmtpPort),
+                Credentials = new NetworkCredential(SmtpUser, SmtpPassword),
+                EnableSsl = true
+            };
+
+            smtp.Send(mail);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error sending email:");
+            Console.WriteLine(ex.Message);
+            LogError(ex.Message, ex.Source ?? "Unknown");
+        }
+    }
+
+    private static void LogError(string message, string source)
+    {
+        try
+        {
+            File.AppendAllText(
+                Path.Combine(AppContext.BaseDirectory, "ErrorLog.txt"),
+                DateTime.Now + " Error: " + message + " Source: " + source + Environment.NewLine);
+        }
+        catch (Exception)
+        {
+            Console.WriteLine("Error logging previous error.");
+            Console.WriteLine("Make sure the Error log is not open.");
         }
     }
 }

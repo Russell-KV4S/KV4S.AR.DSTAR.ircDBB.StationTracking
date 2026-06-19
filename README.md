@@ -1,7 +1,7 @@
 # Current Version 1.0.3
 https://github.com/Russell-KV4S/KV4S.AR.DSTAR.ircDBB.StationTracking/releases/download/v1.0.3/KV4S.AR.DSTAR.ircDBB.StationTracking.zip
 
-Runs on .Net Framework 4.8 install here: https://dotnet.microsoft.com/en-us/download/dotnet-framework/net48
+Runs on .NET 10.0 install here: https://dotnet.microsoft.com/en-us/download/dotnet/10.0
 
 # KV4S.AR.DSTAR.ircDBB.StationTracking
 KV4S.AR.DSTAR.ircDBB.StationTracking gives you ability to get Email and/or Telegram notifications about reflector changes of your favorite D-Star stations.
@@ -12,16 +12,13 @@ https://github.com/AB4EJ-1/DWatcherV1
 
 Contact me if you have feature request or use Git and create your enhancements and merge them back in.
 
-I recommend using Windows Task Scheduler to kick the program off on about a 5-10 minute interval.
+I recommend using Windows Task Scheduler or cron to kick the program off on about a 5-10 minute interval.
 
-Once you download, edit the .config file that's along side the executable as needed (you won't need to copy the config on future releases unless there is a structure change). 
+Once you download, edit the App.config file that's alongside the executable as needed (you won't need to copy the config on future releases unless there is a structure change). 
 There are comments in the file that tells you how to format the entries. Here is the example file:
 ```
 <?xml version="1.0" encoding="utf-8" ?>
 <configuration>
-    <startup> 
-        <supportedRuntime version="v4.0" sku=".NETFramework,Version=v4.5.2" />
-    </startup>
     <appSettings>
         <!--use commas with no spaces to add more-->
         <add key="Callsigns" value="KV4S"/>
